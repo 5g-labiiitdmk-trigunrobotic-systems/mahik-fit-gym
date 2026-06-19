@@ -285,7 +285,7 @@ tbody td { padding:12px 15px; font-size:0.875rem; vertical-align:middle; }
 <div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="logo">
-      <img src="\images\mahik-login.png" alt="Logo">
+      <img src="images/mahik-login.png" alt="Logo">
       <h1>MAHIK FIT GYM</h1>
     </div>
     <p>ADMIN PANEL</p>
@@ -300,7 +300,7 @@ tbody td { padding:12px 15px; font-size:0.875rem; vertical-align:middle; }
       <span id="issuesBadge" style="margin-left:auto;background:#B91C1C;color:white;border-radius:12px;padding:1px 8px;font-size:0.7rem;font-weight:700;display:none"></span>
     </button>
     <div class="nav-label">System</div>
-    <a class="nav-item" href="mahik.html"><i class="fas fa-arrow-left"></i> Back </a>
+    <a class="nav-item" href="/mahik.html"><i class="fas fa-arrow-left"></i> Back </a>
     <button class="nav-item logout-btn" onclick="confirmLogout()" style="color:#fca5a5;"><i class="fas fa-sign-out-alt"></i> Logout</button>
   </nav>
 </div>
@@ -930,7 +930,12 @@ function exportToCSV() {
 /* ── Logout ── */
 function confirmLogout(){document.getElementById('logoutModal').classList.add('show');}
 function closeLogoutModal(){document.getElementById('logoutModal').classList.remove('show');}
-function doLogout(){localStorage.removeItem('authToken');localStorage.removeItem('currentUser');showToast('Logged out!','success');setTimeout(()=>{window.location.href='index.html';},800);}
+function doLogout(){
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('currentUser');
+  showToast('Logged out!','success');
+  setTimeout(()=>{window.location.href='/index.html';},800);
+}
 document.getElementById('logoutModal').addEventListener('click',function(e){if(e.target===this)closeLogoutModal();});
 
 loadData();
