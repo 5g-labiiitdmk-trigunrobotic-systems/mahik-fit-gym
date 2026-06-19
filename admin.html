@@ -930,7 +930,7 @@ function exportToCSV() {
 /* ── Logout ── */
 function confirmLogout(){document.getElementById('logoutModal').classList.add('show');}
 function closeLogoutModal(){document.getElementById('logoutModal').classList.remove('show');}
-function doLogout(){localStorage.removeItem('authToken');localStorage.removeItem('currentUser');showToast('Logged out!','success');setTimeout(()=>{window.location.href='regis.html';},800);}
+function doLogout(){localStorage.removeItem('authToken');localStorage.removeItem('currentUser');showToast('Logged out!','success');setTimeout(()=>{window.location.href='index.html';},800);}
 document.getElementById('logoutModal').addEventListener('click',function(e){if(e.target===this)closeLogoutModal();});
 
 loadData();
