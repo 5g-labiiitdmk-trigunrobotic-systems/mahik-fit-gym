@@ -582,6 +582,14 @@
     </div>
 </div>
 
+<!-- ============ SUPABASE SETUP ============ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = 'https://kbspyvurgltzkzpjemqo.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_4nIcQ2mrix5OUg7P2tUHlQ_7JiXArPE';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
+
 <script>
     // ============ Tab Switching ============
     function switchTab(name) {
@@ -606,6 +614,7 @@
     // Change this if your admin dashboard file has a different name
     const ADMIN_PAGE = 'admin.html';
     const USER_PAGE  = 'mahik.html';
+    const ADMIN_EMAIL = 'admin@aigym.com';
 
     function getRedirectPage(user) {
         return (user && user.role === 'master_admin') ? ADMIN_PAGE : USER_PAGE;
@@ -637,8 +646,8 @@
         txt.style.color = s <= 2 ? 'var(--error)' : s === 3 ? 'var(--warning)' : 'var(--success)';
     }
 
-    // ============ LOGIN Function ============
-    function handleLogin(e) {
+    // ============ LOGIN Function (Supabase) ============
+    async function handleLogin(e) {
         e.preventDefault();
         hideAlerts();
 
@@ -649,40 +658,51 @@
         btn.innerHTML = '<div class="spinner"></div> Signing In...';
         btn.disabled = true;
 
-        // Read from 'yogaUsers' 
-        const users = JSON.parse(localStorage.getItem('yogaUsers') || '[]');
-        const user = users.find(u => u.email.toLowerCase() === email);
+        const { data: user, error } = await sb
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .maybeSingle();
 
-        setTimeout(() => {
-            if (!user) {
-                showError('loginError', 'Account not found! Please register first.');
-            } else if (user.password !== password) {
-                showError('loginError', 'Incorrect password!');
-            } else {
-                // LOGIN SUCCESS - Direct login, no approval needed
-                localStorage.setItem('authToken', 'token_' + Date.now());
-                const loggedInUser = {
-                    email: user.email,
-                    fullName: user.fullName,
-                    role: user.role || 'user',
-                    level: user.level || 'beginner'
-                };
-                localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
-                const s = document.getElementById('loginSuccess');
-                s.textContent = loggedInUser.role === 'master_admin'
-                    ? 'Welcome admin! Redirecting to dashboard...'
-                    : 'Login successful! Redirecting...';
-                s.classList.add('show');
-                setTimeout(() => { window.location.href = getRedirectPage(loggedInUser); }, 1000);
-                return;
-            }
+        if (error) {
+            showError('loginError', 'Something went wrong. Please try again.');
             btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
             btn.disabled = false;
-        }, 600);
+            return;
+        }
+
+        if (!user) {
+            showError('loginError', 'Account not found! Please register first.');
+        } else if (user.password !== password) {
+            showError('loginError', 'Incorrect password!');
+        } else if (user.blocked) {
+            showError('loginError', 'Your account has been blocked. Please contact the gym admin.');
+        } else {
+            // LOGIN SUCCESS
+            localStorage.setItem('authToken', 'token_' + Date.now());
+            const isAdmin = user.email === ADMIN_EMAIL;
+            const loggedInUser = {
+                email: user.email,
+                fullName: user.full_name,
+                role: isAdmin ? 'master_admin' : 'user',
+                level: user.level || 'beginner'
+            };
+            localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+            const s = document.getElementById('loginSuccess');
+            s.textContent = isAdmin
+                ? 'Welcome admin! Redirecting to dashboard...'
+                : 'Login successful! Redirecting...';
+            s.classList.add('show');
+            setTimeout(() => { window.location.href = getRedirectPage(loggedInUser); }, 1000);
+            return;
+        }
+
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+        btn.disabled = false;
     }
 
-    // ============ REGISTER Function ============
-    function handleRegister(e) {
+    // ============ REGISTER Function (Supabase) ============
+    async function handleRegister(e) {
         e.preventDefault();
         hideAlerts();
 
@@ -707,55 +727,67 @@
         btn.innerHTML = '<div class="spinner"></div> Creating Account...';
         btn.disabled = true;
 
-        let users = JSON.parse(localStorage.getItem('yogaUsers') || '[]');
+        // Check if email already exists
+        const { data: existing, error: checkError } = await sb
+            .from('users')
+            .select('email')
+            .eq('email', email)
+            .maybeSingle();
 
-        if (users.find(u => u.email.toLowerCase() === email)) {
+        if (checkError) {
+            showError('registerError', 'Something went wrong. Please try again.');
+            btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+            btn.disabled = false;
+            return;
+        }
+
+        if (existing) {
             showError('registerError', 'This email is already registered!');
             btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
             btn.disabled = false;
             return;
         }
 
-        const isAdmin = email === 'admin@aigym.com';
-
-        const newUser = {
-            fullName: name,
+        // Insert new user into Supabase
+        const { error: insertError } = await sb.from('users').insert({
+            full_name: name,
             email: email,
-            age: parseInt(age),
+            age: age,
             gender: gender,
             phone: phone,
             password: password,
-            level: 'beginner',
-            role: isAdmin ? 'master_admin' : 'user',
-            // APPROVED immediately - no pending status
-            status: 'approved',
-            joinedDate: new Date().toLocaleDateString('en-IN')
-        };
+            level: 'beginner'
+        });
 
-        users.push(newUser);
-        localStorage.setItem('yogaUsers', JSON.stringify(users));
-
-        setTimeout(() => {
-            const s = document.getElementById('registerSuccess');
-            s.innerHTML = 'Account created successfully! You can now login.';
-            s.classList.add('show');
-            document.getElementById('registerForm').reset();
+        if (insertError) {
+            showError('registerError', 'Could not create account. Please try again.');
             btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
             btn.disabled = false;
-            // Auto switch to login after successful registration
-            setTimeout(() => switchTab('login'), 2000);
-        }, 800);
+            return;
+        }
+
+        const s = document.getElementById('registerSuccess');
+        s.innerHTML = 'Account created successfully! You can now login.';
+        s.classList.add('show');
+        document.getElementById('registerForm').reset();
+        btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+        btn.disabled = false;
+        // Auto switch to login after successful registration
+        setTimeout(() => switchTab('login'), 2000);
     }
 
-    // ============ Forgot Password ============
-    function showForgotPassword() {
+    // ============ Forgot Password (Supabase) ============
+    async function showForgotPassword() {
         const email = prompt("Enter your registered email:");
         if (!email) return;
 
-        let users = JSON.parse(localStorage.getItem('yogaUsers') || '[]');
-        const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+        const { data: user, error } = await sb
+            .from('users')
+            .select('email')
+            .eq('email', email.trim().toLowerCase())
+            .maybeSingle();
 
-        if (userIndex === -1) {
+        if (error || !user) {
             alert("No account found with this email.");
             return;
         }
@@ -766,8 +798,16 @@
             return;
         }
 
-        users[userIndex].password = newPassword;
-        localStorage.setItem('yogaUsers', JSON.stringify(users));
+        const { error: updateError } = await sb
+            .from('users')
+            .update({ password: newPassword })
+            .eq('email', email.trim().toLowerCase());
+
+        if (updateError) {
+            alert("Something went wrong. Please try again.");
+            return;
+        }
+
         alert("Password updated successfully! Please login with your new password.");
     }
 </script>
