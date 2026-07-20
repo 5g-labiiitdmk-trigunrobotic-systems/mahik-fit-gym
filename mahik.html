@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6028,41 +6029,19 @@ currentPoseIndex = 0;
 
 // Save performance to Supabase
 const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
 if (currentUser && currentUser.role !== 'master_admin') {
-
-    console.log("Current User:", currentUser);
-
     sb.from('performance').insert({
-        user_id: currentUser.id,
-        exercise_name: selectedWorkoutName,
+        user_email: currentUser.email,
+        workout: selectedWorkoutName,
         accuracy: avgAcc,
-        score: avgAcc,
-        correct_poses: completedPoses,
-        total_poses: YOGA_POSES.length,
-        duration: `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`,
-        session_date: new Date().toISOString().split('T')[0],
-        session_time: new Date().toTimeString().split(' ')[0]
+        duration: `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`
     }).then(({ error }) => {
-        if (error) {
-    console.log("Supabase Error:", error);
-    console.log("Message:", error.message);
-    console.log("Details:", error.details);
-    console.log("Hint:", error.hint);
-    console.error("Failed to save performance:", error);
-}
-        } else {
-            console.log("Performance saved successfully!");
-        }
+        if (error) console.error('Failed to save performance:', error);
     });
 
     // Keep a local copy too so "My Performance" still works instantly
     let history = JSON.parse(localStorage.getItem('gymPerformance') || '{}');
-
-    if (!history[currentUser.email]) {
-        history[currentUser.email] = [];
-    }
-
+    if (!history[currentUser.email]) history[currentUser.email] = [];
     history[currentUser.email].push({
         date: new Date().toLocaleDateString(),
         time: new Date().toLocaleTimeString(),
@@ -6072,7 +6051,6 @@ if (currentUser && currentUser.role !== 'master_admin') {
         totalPoses: YOGA_POSES.length,
         workout: selectedWorkoutName
     });
-
     localStorage.setItem('gymPerformance', JSON.stringify(history));
 }
 
