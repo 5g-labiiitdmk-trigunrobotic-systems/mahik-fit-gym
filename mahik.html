@@ -6031,6 +6031,8 @@ const currentUser = JSON.parse(localStorage.getItem('currentUser'));
 
 if (currentUser && currentUser.role !== 'master_admin') {
 
+    console.log("Current User:", currentUser);
+
     sb.from('performance').insert({
         user_id: currentUser.id,
         exercise_name: selectedWorkoutName,
@@ -6043,7 +6045,12 @@ if (currentUser && currentUser.role !== 'master_admin') {
         session_time: new Date().toTimeString().split(' ')[0]
     }).then(({ error }) => {
         if (error) {
-            console.error("Failed to save performance:", error);
+    console.log("Supabase Error:", error);
+    console.log("Message:", error.message);
+    console.log("Details:", error.details);
+    console.log("Hint:", error.hint);
+    console.error("Failed to save performance:", error);
+}
         } else {
             console.log("Performance saved successfully!");
         }
