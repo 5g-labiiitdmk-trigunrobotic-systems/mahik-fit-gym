@@ -682,6 +682,7 @@
             localStorage.setItem('authToken', 'token_' + Date.now());
             const isAdmin = user.email === ADMIN_EMAIL;
             const loggedInUser = {
+                id: user.id,
                 email: user.email,
                 fullName: user.full_name,
                 role: isAdmin ? 'master_admin' : 'user',
