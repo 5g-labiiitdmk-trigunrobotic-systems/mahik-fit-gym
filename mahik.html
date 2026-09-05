@@ -5243,16 +5243,16 @@ function closePerformance() {
     document.getElementById('performanceModal').classList.remove('show');
 }
 
-// Eligibility: 40 hours of training OR 40 sessions logged on 40 different days
-// (days need not be consecutive). Accuracy then decides the award tier:
+// Eligibility: 40 sessions in which the user completed ALL poses of the
+// activity with at least 50% accuracy in that session. Only sessions
+// meeting both conditions count toward the 40, and only those sessions'
+// accuracy feeds the award tier:
 //   50%+ -> Basic, 75%+ -> Intermediate, 90%+ -> Excellent
-const CERTIFICATE_REQUIRED_HOURS = 40;
-const CERTIFICATE_REQUIRED_DAYS = 40;
+const CERTIFICATE_REQUIRED_SESSIONS = 40;
+const CERTIFICATE_MIN_ACCURACY = 50;
 
-function parseDurationToMinutes(duration) {
-    if (typeof duration !== 'string' || !duration.includes(':')) return 0;
-    const [mm, ss] = duration.split(':').map(Number);
-    return (mm || 0) + (ss || 0) / 60;
+function isQualifyingSession(s) {
+    return s.posesCompleted === s.totalPoses && s.accuracy >= CERTIFICATE_MIN_ACCURACY;
 }
 
 function getCertificateTier(avgAccuracy) {
@@ -5270,38 +5270,33 @@ function showCertificate() {
 
     const allHistory = JSON.parse(localStorage.getItem('gymPerformance') || '{}');
     const sessions = allHistory[currentUser.email] || [];
+    const qualifyingSessions = sessions.filter(isQualifyingSession);
 
     const canvas = document.getElementById('certificateCanvas');
     const emptyMsg = document.getElementById('certificate-empty');
     const downloadBtn = document.getElementById('certificate-download-btn');
 
-    const totalSessions = sessions.length;
-    const totalHours = sessions.reduce((sum, s) => sum + parseDurationToMinutes(s.duration), 0) / 60;
-    const distinctDays = new Set(sessions.map(s => s.date)).size;
-    const avgAccuracy = totalSessions > 0
-        ? Math.round(sessions.reduce((s, r) => s + r.accuracy, 0) / totalSessions)
+    const qualifyingCount = qualifyingSessions.length;
+    const avgAccuracy = qualifyingCount > 0
+        ? Math.round(qualifyingSessions.reduce((s, r) => s + r.accuracy, 0) / qualifyingCount)
         : 0;
 
-    const meetsHours = totalHours >= CERTIFICATE_REQUIRED_HOURS;
-    const meetsDays = distinctDays >= CERTIFICATE_REQUIRED_DAYS;
     const tier = getCertificateTier(avgAccuracy);
-    const isEligible = (meetsHours || meetsDays) && tier;
+    const isEligible = qualifyingCount >= CERTIFICATE_REQUIRED_SESSIONS && tier;
 
     if (!isEligible) {
         canvas.style.display = 'none';
         downloadBtn.style.display = 'none';
         emptyMsg.style.display = 'block';
 
-        const hoursLeft = Math.max(0, CERTIFICATE_REQUIRED_HOURS - totalHours).toFixed(1);
-        const daysLeft = Math.max(0, CERTIFICATE_REQUIRED_DAYS - distinctDays);
+        const sessionsLeft = Math.max(0, CERTIFICATE_REQUIRED_SESSIONS - qualifyingCount);
         emptyMsg.innerHTML = `
             <i class="fas fa-certificate" style="font-size:2rem; margin-bottom:10px; display:block;"></i>
-            ${totalSessions === 0
+            ${sessions.length === 0
                 ? 'Complete workout sessions to unlock your certificate!'
-                : `Keep going! You still need <strong>${hoursLeft} more hours</strong> or
-                   <strong>${daysLeft} more training days</strong> (currently ${totalHours.toFixed(1)}h
-                   across ${distinctDays} day${distinctDays === 1 ? '' : 's'}), plus at least
-                   50% average accuracy to earn a certificate. Your average accuracy so far: ${avgAccuracy}%.`}
+                : `Keep going! You've completed <strong>${qualifyingCount}/${CERTIFICATE_REQUIRED_SESSIONS}</strong>
+                   qualifying sessions (all poses done with at least 50% accuracy).
+                   ${sessionsLeft} more to go!`}
         `;
     } else {
         canvas.style.display = 'inline-block';
@@ -5312,11 +5307,11 @@ function showCertificate() {
         const issueDate = new Date().toLocaleDateString('en-GB', {
             year: 'numeric', month: 'long', day: 'numeric'
         });
-        const certId = getCertificateId(currentUser.email, totalSessions);
+        const certId = getCertificateId(currentUser.email, qualifyingCount);
 
         drawCertificate(canvas, {
             name: fullName,
-            totalSessions,
+            totalSessions: qualifyingCount,
             avgAccuracy,
             issueDate,
             certId,
