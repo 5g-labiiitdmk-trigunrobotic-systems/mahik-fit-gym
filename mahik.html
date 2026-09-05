@@ -2326,6 +2326,36 @@
         </div>
     </div>
 </div>
+
+<!-- Certificate Modal -->
+<div class="modal" id="certificateModal">
+    <div class="modal-content" style="max-width:750px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-certificate"></i> My Certificate</h2>
+            <button class="modal-close" onclick="closeCertificate()">&times;</button>
+        </div>
+
+        <div style="padding: 0 20px 20px; text-align:center;">
+            <canvas id="certificateCanvas" width="1000" height="700"
+                style="width:100%; max-width:700px; border:1px solid #ddd; border-radius:8px; background:#fff;"></canvas>
+
+            <div id="certificate-empty" style="display:none; text-align:center; color:#999; padding:30px;">
+                <i class="fas fa-certificate" style="font-size:2rem; margin-bottom:10px; display:block;"></i>
+                Complete at least one workout session to unlock your certificate!
+            </div>
+
+            <div style="margin-top:16px;">
+                <button class="btn" id="certificate-download-btn"
+                    onclick="downloadCertificate()"
+                    style="background:#4a6fa5; color:#fff; border:none; padding:10px 22px;
+                           border-radius:8px; font-weight:600; cursor:pointer;">
+                    <i class="fas fa-download"></i> Download Certificate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- Completion Overlay -->
     <div class="completion-overlay" id="completion-overlay">
         <div class="completion-content">
@@ -2386,6 +2416,9 @@
                         </button>
                         <button class="user-menu-item" onclick="showCalendar()">
                             <i class="fas fa-calendar-alt"></i> Gym Calendar
+                        </button>
+                        <button class="user-menu-item" onclick="showCertificate()">
+                            <i class="fas fa-certificate"></i> My Certificate
                         </button>
                         <button class="user-menu-item" id="adminMenuItem" onclick="openAdminPanel()" style="display:none">
                             <i class="fas fa-shield-alt"></i> Admin Dashboard
@@ -5208,6 +5241,130 @@ function showPerformance() {
 
 function closePerformance() {
     document.getElementById('performanceModal').classList.remove('show');
+}
+
+function showCertificate() {
+    userMenu.classList.remove('show');
+
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    if (!currentUser) return;
+
+    const allHistory = JSON.parse(localStorage.getItem('gymPerformance') || '{}');
+    const sessions = allHistory[currentUser.email] || [];
+
+    const canvas = document.getElementById('certificateCanvas');
+    const emptyMsg = document.getElementById('certificate-empty');
+    const downloadBtn = document.getElementById('certificate-download-btn');
+
+    if (sessions.length === 0) {
+        canvas.style.display = 'none';
+        downloadBtn.style.display = 'none';
+        emptyMsg.style.display = 'block';
+    } else {
+        canvas.style.display = 'inline-block';
+        downloadBtn.style.display = 'inline-block';
+        emptyMsg.style.display = 'none';
+
+        const totalSessions = sessions.length;
+        const bestAccuracy = Math.max(...sessions.map(s => s.accuracy));
+        const fullName = currentUser.fullName || currentUser.name || currentUser.email;
+        const issueDate = new Date().toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        drawCertificate(canvas, {
+            name: fullName,
+            totalSessions,
+            bestAccuracy,
+            issueDate
+        });
+    }
+
+    document.getElementById('certificateModal').classList.add('show');
+}
+
+function closeCertificate() {
+    document.getElementById('certificateModal').classList.remove('show');
+}
+
+function drawCertificate(canvas, data) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background
+    ctx.fillStyle = '#fdfcf7';
+    ctx.fillRect(0, 0, w, h);
+
+    // Border
+    ctx.strokeStyle = '#4a6fa5';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(20, 20, w - 40, h - 40);
+    ctx.strokeStyle = '#c9a24b';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(35, 35, w - 70, h - 70);
+
+    // Title
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#4a6fa5';
+    ctx.font = 'bold 46px Georgia, serif';
+    ctx.fillText('Certificate of Achievement', w / 2, 150);
+
+    ctx.fillStyle = '#c9a24b';
+    ctx.font = 'italic 22px Georgia, serif';
+    ctx.fillText('AI GYM & Fitness Studio', w / 2, 190);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '20px Georgia, serif';
+    ctx.fillText('This certificate is proudly presented to', w / 2, 260);
+
+    // Name
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 44px "Brush Script MT", cursive, Georgia, serif';
+    ctx.fillText(data.name, w / 2, 330);
+
+    // Underline for name
+    ctx.strokeStyle = '#c9a24b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - 220, 350);
+    ctx.lineTo(w / 2 + 220, 350);
+    ctx.stroke();
+
+    // Body text
+    ctx.fillStyle = '#333';
+    ctx.font = '20px Georgia, serif';
+    ctx.fillText(
+        `for successfully completing ${data.totalSessions} workout session${data.totalSessions === 1 ? '' : 's'}`,
+        w / 2, 400
+    );
+    ctx.fillText(`with a best accuracy score of ${data.bestAccuracy}%`, w / 2, 430);
+
+    // Date
+    ctx.font = '18px Georgia, serif';
+    ctx.fillStyle = '#555';
+    ctx.fillText(`Issued on ${data.issueDate}`, w / 2, 500);
+
+    // Signature line
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - 150, 600);
+    ctx.lineTo(w / 2 + 150, 600);
+    ctx.stroke();
+    ctx.font = '16px Georgia, serif';
+    ctx.fillStyle = '#333';
+    ctx.fillText('Authorized Signature', w / 2, 625);
+}
+
+function downloadCertificate() {
+    const canvas = document.getElementById('certificateCanvas');
+    const link = document.createElement('a');
+    link.download = 'AI_GYM_Certificate.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
 }
 
         function closeCalendar() {
