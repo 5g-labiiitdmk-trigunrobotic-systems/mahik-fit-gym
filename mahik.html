@@ -5243,6 +5243,25 @@ function closePerformance() {
     document.getElementById('performanceModal').classList.remove('show');
 }
 
+// Eligibility: 40 hours of training OR 40 sessions logged on 40 different days
+// (days need not be consecutive). Accuracy then decides the award tier:
+//   50%+ -> Basic, 75%+ -> Intermediate, 90%+ -> Excellent
+const CERTIFICATE_REQUIRED_HOURS = 40;
+const CERTIFICATE_REQUIRED_DAYS = 40;
+
+function parseDurationToMinutes(duration) {
+    if (typeof duration !== 'string' || !duration.includes(':')) return 0;
+    const [mm, ss] = duration.split(':').map(Number);
+    return (mm || 0) + (ss || 0) / 60;
+}
+
+function getCertificateTier(avgAccuracy) {
+    if (avgAccuracy >= 90) return 'Excellent';
+    if (avgAccuracy >= 75) return 'Intermediate';
+    if (avgAccuracy >= 50) return 'Basic';
+    return null;
+}
+
 function showCertificate() {
     userMenu.classList.remove('show');
 
@@ -5256,17 +5275,39 @@ function showCertificate() {
     const emptyMsg = document.getElementById('certificate-empty');
     const downloadBtn = document.getElementById('certificate-download-btn');
 
-    if (sessions.length === 0) {
+    const totalSessions = sessions.length;
+    const totalHours = sessions.reduce((sum, s) => sum + parseDurationToMinutes(s.duration), 0) / 60;
+    const distinctDays = new Set(sessions.map(s => s.date)).size;
+    const avgAccuracy = totalSessions > 0
+        ? Math.round(sessions.reduce((s, r) => s + r.accuracy, 0) / totalSessions)
+        : 0;
+
+    const meetsHours = totalHours >= CERTIFICATE_REQUIRED_HOURS;
+    const meetsDays = distinctDays >= CERTIFICATE_REQUIRED_DAYS;
+    const tier = getCertificateTier(avgAccuracy);
+    const isEligible = (meetsHours || meetsDays) && tier;
+
+    if (!isEligible) {
         canvas.style.display = 'none';
         downloadBtn.style.display = 'none';
         emptyMsg.style.display = 'block';
+
+        const hoursLeft = Math.max(0, CERTIFICATE_REQUIRED_HOURS - totalHours).toFixed(1);
+        const daysLeft = Math.max(0, CERTIFICATE_REQUIRED_DAYS - distinctDays);
+        emptyMsg.innerHTML = `
+            <i class="fas fa-certificate" style="font-size:2rem; margin-bottom:10px; display:block;"></i>
+            ${totalSessions === 0
+                ? 'Complete workout sessions to unlock your certificate!'
+                : `Keep going! You still need <strong>${hoursLeft} more hours</strong> or
+                   <strong>${daysLeft} more training days</strong> (currently ${totalHours.toFixed(1)}h
+                   across ${distinctDays} day${distinctDays === 1 ? '' : 's'}), plus at least
+                   50% average accuracy to earn a certificate. Your average accuracy so far: ${avgAccuracy}%.`}
+        `;
     } else {
         canvas.style.display = 'inline-block';
         downloadBtn.style.display = 'inline-block';
         emptyMsg.style.display = 'none';
 
-        const totalSessions = sessions.length;
-        const avgAccuracy = Math.round(sessions.reduce((s, r) => s + r.accuracy, 0) / totalSessions);
         const fullName = currentUser.fullName || currentUser.name || currentUser.email;
         const issueDate = new Date().toLocaleDateString('en-GB', {
             year: 'numeric', month: 'long', day: 'numeric'
@@ -5278,7 +5319,8 @@ function showCertificate() {
             totalSessions,
             avgAccuracy,
             issueDate,
-            certId
+            certId,
+            tier
         });
     }
 
@@ -5393,6 +5435,21 @@ function drawCertificate(canvas, data) {
     ctx.fillText(line1, w / 2, 425);
     ctx.fillText(line2, w / 2, 450);
     ctx.fillText(line3, w / 2, 475);
+
+    // Award tier badge
+    const tierColors = { Excellent: '#c9a227', Intermediate: '#4a6fa5', Basic: '#7a7a7a' };
+    const tierColor = tierColors[data.tier] || '#7a7a7a';
+    const badgeText = `${data.tier.toUpperCase()} AWARD`;
+    ctx.font = 'bold 13px Arial, sans-serif';
+    const badgeWidth = ctx.measureText(badgeText).width + 40;
+    const badgeX = w / 2 - badgeWidth / 2;
+    const badgeY = 495;
+    ctx.fillStyle = tierColor;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(badgeX, badgeY, badgeWidth, 28, 14) : ctx.rect(badgeX, badgeY, badgeWidth, 28);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(badgeText, w / 2, badgeY + 19);
 
     // Footer: Date issued (left), seal (center), certificate ID (right)
     const footerY = h - 110;
