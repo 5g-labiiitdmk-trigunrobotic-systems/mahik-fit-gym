@@ -5266,17 +5266,19 @@ function showCertificate() {
         emptyMsg.style.display = 'none';
 
         const totalSessions = sessions.length;
-        const bestAccuracy = Math.max(...sessions.map(s => s.accuracy));
+        const avgAccuracy = Math.round(sessions.reduce((s, r) => s + r.accuracy, 0) / totalSessions);
         const fullName = currentUser.fullName || currentUser.name || currentUser.email;
-        const issueDate = new Date().toLocaleDateString('en-US', {
+        const issueDate = new Date().toLocaleDateString('en-GB', {
             year: 'numeric', month: 'long', day: 'numeric'
         });
+        const certId = getCertificateId(currentUser.email, totalSessions);
 
         drawCertificate(canvas, {
             name: fullName,
             totalSessions,
-            bestAccuracy,
-            issueDate
+            avgAccuracy,
+            issueDate,
+            certId
         });
     }
 
@@ -5287,76 +5289,149 @@ function closeCertificate() {
     document.getElementById('certificateModal').classList.remove('show');
 }
 
+function getCertificateId(email, totalSessions) {
+    // Deterministic short hash so re-opening the certificate keeps the same ID
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+        hash = (hash * 31 + email.charCodeAt(i)) >>> 0;
+    }
+    const code = hash.toString(36).toUpperCase().slice(0, 6).padEnd(6, '0');
+    return `MFG-${code}-${totalSessions}`;
+}
+
 function drawCertificate(canvas, data) {
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
 
+    const red = '#c0212e';
+    const gold = '#d4af37';
+    const darkText = '#2a1620';
+    const grayText = '#666';
+
     ctx.clearRect(0, 0, w, h);
 
     // Background
-    ctx.fillStyle = '#fdfcf7';
+    ctx.fillStyle = '#fdfcf5';
     ctx.fillRect(0, 0, w, h);
 
-    // Border
-    ctx.strokeStyle = '#4a6fa5';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(20, 20, w - 40, h - 40);
-    ctx.strokeStyle = '#c9a24b';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(35, 35, w - 70, h - 70);
+    // Outer red border + inner thin gold border
+    ctx.strokeStyle = red;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(30, 30, w - 60, h - 60);
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(42, 42, w - 84, h - 84);
+
+    // Diamond corner accents
+    const drawDiamond = (x, y, size, color) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x + size, y);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x - size, y);
+        ctx.closePath();
+        ctx.fill();
+    };
+    drawDiamond(30, 30, 12, gold);
+    drawDiamond(w - 30, 30, 12, gold);
+    drawDiamond(30, h - 30, 12, gold);
+    drawDiamond(w - 30, h - 30, 12, gold);
+
+    ctx.textAlign = 'center';
+
+    // Logo circle
+    ctx.fillStyle = red;
+    ctx.beginPath();
+    ctx.arc(w / 2, 105, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px Arial, sans-serif';
+    ctx.fillText('MFG', w / 2, 112);
+
+    // Company line
+    ctx.fillStyle = red;
+    ctx.font = 'bold 17px Arial, sans-serif';
+    ctx.fillText('TRIGUN ROBOTIC SYSTEMS PVT. LTD.  —  KURNOOL', w / 2, 168);
+
+    ctx.fillStyle = grayText;
+    ctx.font = '11px Arial, sans-serif';
+    ctx.fillText('AI-POWERED SMART FITNESS TRAINER', w / 2, 188);
 
     // Title
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#4a6fa5';
-    ctx.font = 'bold 46px Georgia, serif';
-    ctx.fillText('Certificate of Achievement', w / 2, 150);
+    ctx.fillStyle = darkText;
+    ctx.font = 'bold 42px Georgia, "Times New Roman", serif';
+    ctx.fillText('Certificate of Achievement', w / 2, 245);
 
-    ctx.fillStyle = '#c9a24b';
-    ctx.font = 'italic 22px Georgia, serif';
-    ctx.fillText('AI GYM & Fitness Studio', w / 2, 190);
+    ctx.fillStyle = grayText;
+    ctx.font = '14px Arial, sans-serif';
+    ctx.fillText('M A H I K   F I T   G Y M', w / 2, 275);
 
-    ctx.fillStyle = '#333';
-    ctx.font = '20px Georgia, serif';
-    ctx.fillText('This certificate is proudly presented to', w / 2, 260);
+    ctx.fillStyle = grayText;
+    ctx.font = '17px Arial, sans-serif';
+    ctx.fillText('This certificate is proudly presented to', w / 2, 325);
 
     // Name
-    ctx.fillStyle = '#222';
-    ctx.font = 'bold 44px "Brush Script MT", cursive, Georgia, serif';
-    ctx.fillText(data.name, w / 2, 330);
+    ctx.fillStyle = red;
+    ctx.font = 'bold 34px Georgia, "Times New Roman", serif';
+    ctx.fillText(data.name, w / 2, 375);
 
-    // Underline for name
-    ctx.strokeStyle = '#c9a24b';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = red;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(w / 2 - 220, 350);
-    ctx.lineTo(w / 2 + 220, 350);
+    ctx.moveTo(w / 2 - 140, 388);
+    ctx.lineTo(w / 2 + 140, 388);
     ctx.stroke();
 
     // Body text
     ctx.fillStyle = '#333';
-    ctx.font = '20px Georgia, serif';
-    ctx.fillText(
-        `for successfully completing ${data.totalSessions} workout session${data.totalSessions === 1 ? '' : 's'}`,
-        w / 2, 400
-    );
-    ctx.fillText(`with a best accuracy score of ${data.bestAccuracy}%`, w / 2, 430);
+    ctx.font = '16px Arial, sans-serif';
+    const line1 = `For successfully completing ${data.totalSessions} AI-guided workout session${data.totalSessions === 1 ? '' : 's'} with an average form`;
+    const line2 = `accuracy of ${data.avgAccuracy}%, demonstrating consistency, discipline, and dedication to a`;
+    const line3 = 'healthier lifestyle.';
+    ctx.fillText(line1, w / 2, 425);
+    ctx.fillText(line2, w / 2, 450);
+    ctx.fillText(line3, w / 2, 475);
 
-    // Date
-    ctx.font = '18px Georgia, serif';
-    ctx.fillStyle = '#555';
-    ctx.fillText(`Issued on ${data.issueDate}`, w / 2, 500);
-
-    // Signature line
-    ctx.strokeStyle = '#999';
+    // Footer: Date issued (left), seal (center), certificate ID (right)
+    const footerY = h - 110;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = grayText;
+    ctx.font = '11px Arial, sans-serif';
+    ctx.fillText('DATE ISSUED', 90, footerY);
+    ctx.fillStyle = darkText;
+    ctx.font = 'bold 15px Arial, sans-serif';
+    ctx.fillText(data.issueDate, 90, footerY + 22);
+    ctx.strokeStyle = '#ccc';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(w / 2 - 150, 600);
-    ctx.lineTo(w / 2 + 150, 600);
+    ctx.moveTo(90, footerY + 34);
+    ctx.lineTo(260, footerY + 34);
     ctx.stroke();
-    ctx.font = '16px Georgia, serif';
-    ctx.fillStyle = '#333';
-    ctx.fillText('Authorized Signature', w / 2, 625);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = grayText;
+    ctx.font = '11px Arial, sans-serif';
+    ctx.fillText('CERTIFICATE ID', w - 90, footerY);
+    ctx.fillStyle = darkText;
+    ctx.font = 'bold 15px Arial, sans-serif';
+    ctx.fillText(data.certId, w - 90, footerY + 22);
+    ctx.beginPath();
+    ctx.moveTo(w - 260, footerY + 34);
+    ctx.lineTo(w - 90, footerY + 34);
+    ctx.stroke();
+
+    // Center seal
+    ctx.fillStyle = red;
+    ctx.beginPath();
+    ctx.arc(w / 2, footerY + 5, 38, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 13px Arial, sans-serif';
+    ctx.fillText('MAHIK', w / 2, footerY - 2);
+    ctx.fillText('FIT GYM', w / 2, footerY + 14);
 }
 
 function downloadCertificate() {
